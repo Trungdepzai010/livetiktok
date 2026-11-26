@@ -45,6 +45,8 @@ export const normChat = d => ({ type: 'chat', user: userOf(d), text: String(d?.c
 async function start() {
   const { WebSocketServer } = await import('ws');
   const { TikTokLiveConnection, WebcastEvent } = await import('tiktok-live-connector');
+  process.on('uncaughtException', e => console.error('uncaughtException', e));
+  process.on('unhandledRejection', e => console.error('unhandledRejection', e));
   const KEY = process.env.EULER_API_KEY || '';
   const TOKEN = process.env.TOKEN || '';
   const PORT = Number(process.env.PORT) || 8080;
@@ -55,36 +57,48 @@ async function start() {
   const rooms = new Map();
   const send = (room, obj) => { const s = JSON.stringify(obj); for (const c of room.clients) if (c.readyState === 1) c.send(s); };
 
+  const errText = e => {
+    const m = [e?.message, e?.exception?.message, e?.info].filter(Boolean).join(' | ') || String(e);
+    return `${e?.name || 'Error'}: ${m}`.slice(0, 180);
+  };
+
   function connectRoom(room) {
     if (room.connecting || room.connected) return;
     room.connecting = true;
-    const conn = new TikTokLiveConnection(room.id, KEY ? { signApiKey: KEY, enableExtendedGiftInfo: true } : { enableExtendedGiftInfo: true });
-    room.conn = conn;
-    const fwd = (ev, fn) => conn.on(ev, d => {
-      try { const m = fn(d); if (m) { if (process.env.DEBUG) console.log(JSON.stringify(m)); send(room, m) } } catch (e) { console.error(e) }
-    });
-    fwd(WebcastEvent.GIFT, room.norm);
-    fwd(WebcastEvent.LIKE, normLike);
-    fwd(WebcastEvent.FOLLOW, normFollow);
-    fwd(WebcastEvent.SHARE, normShare);
-    fwd(WebcastEvent.CHAT, normChat);
-    const lost = () => { room.connected = false; room.connecting = false; send(room, { type: 'status', msg: 'Mất kết nối TikTok, đang nối lại…' }) };
-    conn.on('disconnected', lost);
-    conn.on('streamEnd', lost);
-    conn.connect().then(state => {
-      room.connected = true; room.connecting = false;
-      console.log('connected', room.id, state?.roomId);
-      send(room, { type: 'status', msg: `Đã nối @${room.id}` });
-    }).catch(err => {
-      room.connected = false; room.connecting = false;
-      const msg = String(err?.message || err);
-      console.warn('connect fail', room.id, msg);
-      send(room, { type: 'status', msg: `Chưa nối được @${room.id} (đang live chưa?): ${msg.slice(0, 120)}` });
-    });
+    try {
+      const conn = new TikTokLiveConnection(room.id, KEY ? { signApiKey: KEY, enableExtendedGiftInfo: true } : { enableExtendedGiftInfo: true });
+      room.conn = conn;
+      const fwd = (ev, fn) => conn.on(ev, d => {
+        try { const m = fn(d); if (m) { if (process.env.DEBUG) console.log(JSON.stringify(m)); send(room, m) } } catch (e) { console.error(e) }
+      });
+      fwd(WebcastEvent.GIFT, room.norm);
+      fwd(WebcastEvent.LIKE, normLike);
+      fwd(WebcastEvent.FOLLOW, normFollow);
+      fwd(WebcastEvent.SHARE, normShare);
+      fwd(WebcastEvent.CHAT, normChat);
+      conn.on('error', e => { console.error('conn error', room.id, e); send(room, { type: 'status', msg: 'Lỗi TikTok: ' + errText(e) }) });
+      const lost = () => { room.connected = false; room.connecting = false; send(room, { type: 'status', msg: 'Mất kết nối TikTok, đang nối lại…' }) };
+      conn.on('disconnected', lost);
+      conn.on('streamEnd', lost);
+      conn.connect().then(state => {
+        room.connected = true; room.connecting = false;
+        console.log('connected', room.id, state?.roomId);
+        send(room, { type: 'status', msg: `Đã nối @${room.id}` });
+      }).catch(err => {
+        room.connected = false; room.connecting = false;
+        console.warn('connect fail', room.id, err);
+        send(room, { type: 'status', msg: `Chưa nối được @${room.id}: ${errText(err)}` });
+      });
+    } catch (e) {
+      room.connecting = false; room.connected = false;
+      console.error('connectRoom crash', e);
+      send(room, { type: 'status', msg: 'Lỗi server: ' + errText(e) });
+    }
   }
 
   wss.on('connection', (ws, req) => {
     const url = new URL(req.url, 'http://x');
+    console.log('client connected', url.searchParams.get('uniqueId'));
     const id = (url.searchParams.get('uniqueId') || '').replace(/^@/, '').trim();
     if (TOKEN && url.searchParams.get('token') !== TOKEN) { ws.send(JSON.stringify({ type: 'status', msg: 'Sai mã bảo vệ' })); return ws.close(4401) }
     if (!id) { ws.send(JSON.stringify({ type: 'status', msg: 'Thiếu tên TikTok (uniqueId)' })); return ws.close(4400) }
