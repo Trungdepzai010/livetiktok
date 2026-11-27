@@ -25,7 +25,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:#111;color:#fff;font-f
 #feed div{background:rgba(10,12,30,.65);border:1px solid rgba(255,255,255,.1);padding:4px 10px;border-radius:12px;font-size:13px;font-weight:600;width:fit-content;animation:in .25s}
 @keyframes in{from{transform:translateX(-30px);opacity:0}}
 #gear{position:absolute;top:46%;right:6px;opacity:.25;background:#000a;color:#fff;border:0;border-radius:8px;padding:6px 9px;font-size:16px;z-index:5}
-#set{position:fixed;inset:0;background:#0b0e1a;z-index:20;display:none;overflow:auto;padding:calc(env(safe-area-inset-top) + 12px) 14px 30px}
+#set{position:fixed;left:0;right:0;top:0;height:56%;background:rgba(11,14,26,.97);z-index:20;display:none;overflow:auto;-webkit-overflow-scrolling:touch;padding:calc(env(safe-area-inset-top) + 10px) 14px 24px;border-radius:0 0 18px 18px;border-bottom:2px solid #25f4ee;box-shadow:0 10px 30px rgba(0,0,0,.6)}
 #set.show{display:block}
 #set h3{margin:14px 0 6px;font-size:14px;color:#25f4ee}
 #set input,#set textarea{width:100%;background:#1a1f36;color:#fff;border:1px solid #3a4270;border-radius:8px;padding:9px;font-size:14px;font-family:ui-monospace,monospace}
@@ -50,6 +50,13 @@ button.p{background:#fe2c55;border-color:#fe2c55}
 .gr input{width:auto!important;flex:1;min-width:0}
 .gr select{flex:1}
 .chip{font-size:12px!important;padding:5px 9px!important}
+.rr{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;padding:8px;background:#141830;border-radius:10px}
+.rr select,.rr input{min-width:0}
+.rr .k{flex:1 1 44%}
+.rr .p{width:auto!important;flex:1 1 44%}
+.rr .a{flex:1 1 52%;max-width:none!important}
+.rr .t{flex:0 0 auto}
+#cat,#seen{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
 </style>
 </head>
 <body>
@@ -69,24 +76,24 @@ button.p{background:#fe2c55;border-color:#fe2c55}
 
 <div id="set">
   <button class="b" onclick="closeSet()">✕ Đóng</button>
-  <h3>① Kết nối TikTok (qua server trung gian)</h3>
-  <input id="ws" placeholder="wss://ten-app.onrender.com" autocapitalize="off" autocorrect="off">
+  <h3>① Kết nối TikTok</h3>
+  <input id="ws" placeholder="wss://api.tik.tools  (hoặc link Railway)" autocapitalize="off" autocorrect="off">
   <input id="uid" placeholder="@tên TikTok đang live" autocapitalize="off" autocorrect="off" style="margin-top:6px">
-  <input id="token" placeholder="mã bảo vệ (nếu server có đặt)" autocapitalize="off" autocorrect="off" style="margin-top:6px">
+  <input id="tkey" placeholder="API key tik.tools (chỉ khi nối thẳng wss://api.tik.tools)" autocapitalize="off" autocorrect="off" style="margin-top:6px">
+  <input id="token" placeholder="Mã bảo vệ Railway (chỉ khi dùng Railway, không có thì để trống)" autocapitalize="off" autocorrect="off" style="margin-top:6px">
   <button class="b p" onclick="saveCfg()">Lưu &amp; kết nối</button>
   <h3>② Luật chơi</h3>
   <div class="gr"><span>Khối/giây</span><input id="rate" type="number"><span>Giữ (s)</span><input id="hold" type="number"></div>
   <div class="gr"><span>Win off live</span><input id="goalw" type="number"><span>Khối/tim</span><input id="likeb" type="number" step="0.1"></div>
-  <h3>③ Follow / Share</h3>
-  <div class="gr"><span>➕ Follow</span><select id="fol"></select></div>
-  <div class="gr"><span>↗️ Share</span><select id="sha"></select></div>
-  <h3>④ Quà tặng → hiệu ứng</h3>
-  <div id="gl"></div>
-  <button class="b" onclick="addRow()">+ Thêm quà</button>
+  <h3>③ Tương tác – tự chọn hiệu ứng</h3>
+  <div style="font-size:12px;opacity:.7;margin-bottom:8px">Mỗi khung = 1 luật: viewer làm việc đó → xảy ra hiệu ứng. Bấm ▶ để thử ngay.</div>
+  <div id="rl"></div>
+  <button class="b" onclick="addRule()">+ Thêm tương tác</button>
+  <datalist id="giftlist"></datalist>
+  <div style="font-size:12px;opacity:.7;margin-top:12px">Quà phổ biến (bấm để thêm):</div>
+  <div id="cat"></div>
   <div style="font-size:12px;opacity:.7;margin-top:10px">Quà vừa thấy trong live (bấm để thêm):</div>
   <div id="seen"></div>
-  <h3>Comment → hành động (JSON, vd {"tnt":"tnt"})</h3>
-  <textarea id="words" style="height:60px" autocapitalize="off" autocorrect="off"></textarea>
   <label style="display:block;margin-top:12px;font-size:14px"><input type="checkbox" id="leg">Hiện bảng hướng dẫn quà trên màn hình</label>
   <h3>Test hiệu ứng</h3>
   <div id="tests"></div>
@@ -105,11 +112,26 @@ const COLS=20, ROWS=300, N=COLS*ROWS;
 const COL=[null,[139,90,43],[128,128,128],[240,196,48],[58,62,80],[30,18,52]];       // màu nền ô
 const PCOL=[null,[139,90,43],[135,135,135],[245,205,60],[70,225,215],[120,55,180]];  // màu mảnh vỡ
 const typeForRow=r=>r<60?1:r<120?2:r<180?3:r<240?4:5;
-const DEF={ws:'',uid:'',token:'',rate:15,hold:10,goalw:15,likeBlocks:1,follow:'boost',share:'rain',legend:true,
-  gifts:{"rose":"win+","tiktok":"win+","heart me":"win-","finger heart":"tnt","gg":"creeper","doughnut":"lava","hand hearts":"boost","love you":"freeze","perfume":"rain","galaxy":"meteor","lion":"win+3"},
-  words:{}};
+const DEF_RULES=[
+  {on:'gift',p:'rose',do:'win+'},{on:'gift',p:'tiktok',do:'win+'},{on:'gift',p:'heart me',do:'win-'},
+  {on:'gift',p:'finger heart',do:'tnt'},{on:'gift',p:'gg',do:'creeper'},{on:'gift',p:'doughnut',do:'lava'},
+  {on:'gift',p:'hand hearts',do:'boost'},{on:'gift',p:'love you',do:'freeze'},{on:'gift',p:'perfume',do:'rain'},
+  {on:'gift',p:'galaxy',do:'meteor'},{on:'gift',p:'lion',do:'win+3'},
+  {on:'follow',p:'',do:'boost'},{on:'share',p:'',do:'rain'},{on:'like',p:'100',do:'rain'}];
+const DEF={ws:'',uid:'',token:'',key:'',rate:15,hold:10,goalw:15,likeBlocks:1,legend:true,rules:DEF_RULES};
+function migrateRules(c){
+  const r=[];
+  Object.entries(c.gifts||{}).forEach(([k,a])=>r.push({on:'gift',p:k,do:a}));
+  if(c.follow)r.push({on:'follow',p:'',do:c.follow});
+  if(c.share)r.push({on:'share',p:'',do:c.share});
+  Object.entries(c.words||{}).forEach(([k,a])=>r.push({on:'comment',p:k,do:a}));
+  return r;
+}
 let CFG=JSON.parse(JSON.stringify(DEF));
-try{const s=localStorage.getItem('lapdat3.cfg');if(s)CFG=Object.assign(CFG,JSON.parse(s))}catch(e){}
+try{
+  const sv=JSON.parse(localStorage.getItem('lapdat3.cfg')||'null');
+  if(sv){CFG=Object.assign(CFG,sv);if(!Array.isArray(sv.rules))CFG.rules=migrateRules(sv)}
+}catch(e){}
 const qs=new URLSearchParams(location.search);
 if(qs.get('uid'))CFG.uid=qs.get('uid');if(qs.get('token'))CFG.token=qs.get('token');
 if(qs.get('ws'))CFG.ws=qs.get('ws');
@@ -388,41 +410,67 @@ const ACTION={
  'rain':{e:'🧱',t:'Mưa khối',fn:w=>{for(let k=0;k<100;k++)later(k*.015,putSafe);ftext('🧱 +100 KHỐI','#ffd23f');feed(`🧱 ${w}: mưa 100 khối`)}}
 };
 function act(a,who='Khách'){if(over)return;const A=ACTION[a];if(A)A.fn(who)}
-function gift(name,who,n=1){
-  const key=String(name||'').toLowerCase();
-  seen.set(key,(seen.get(key)||0)+n);
-  const a=CFG.gifts[key];
-  if(!a||!ACTION[a]){feed(`🎁 ${who}: ${name} (chưa gán)`);return}
-  for(let i=0;i<n;i++)act(a,who);
+const norm=x=>String(x||'').trim().toLowerCase();
+const seenDia=new Map();
+function runRule(r,who,tag){const A=ACTION[r.do];if(!A||over)return;A.fn(tag?`${who} (${tag})`:who)}
+function gift(name,who,n=1,dia=0){
+  const key=norm(name);
+  seen.set(key,(seen.get(key)||0)+n);if(dia)seenDia.set(key,dia);
+  let rs=CFG.rules.filter(r=>r.on==='gift'&&norm(r.p)===key);
+  if(!rs.length&&dia>0){
+    const cs=CFG.rules.filter(r=>r.on==='coin'&&+r.p>0&&dia>=+r.p).sort((a,b)=>b.p-a.p);
+    if(cs.length)rs=[cs[0]];
+  }
+  if(!rs.length){feed(`🎁 ${who}: ${name}${dia?` (${dia} xu)`:''} (chưa gán)`);return}
+  for(let i=0;i<Math.min(n,20);i++)rs.forEach(r=>runRule(r,who));
 }
+const accMap=new WeakMap();
 function like(n,who){
   n=Math.max(1,n|0);likesTotal+=n;
   if(!over)bonusQ=Math.min(800,bonusQ+n*(CFG.likeBlocks||0));
   const t=performance.now();
   if(t-lastLikeFx>120){lastLikeFx=t;for(let k=0;k<Math.min(3,n);k++)parts.push({k:'heart',x:1+Math.random()*(COLS-2),y:cam+1+Math.random()*2,vx:(Math.random()-.5)*1.5,vy:4+Math.random()*3,l:1.8,L:1.8,c:'#ff4d6d',s:.9,g:-.15})}
   if(t-lastLikeFeed>2500){lastLikeFeed=t;feed(`❤️ ${who} thả tim`)}
+  CFG.rules.forEach(r=>{
+    if(r.on!=='like'||over)return;
+    const every=Math.max(1,+r.p||50);let a=(accMap.get(r)||0)+n,k=0;
+    while(a>=every&&k<5){a-=every;k++;runRule(r,who,'tim')}
+    accMap.set(r,a%every);
+  });
 }
 function social(kind,who){
-  const A=ACTION[CFG[kind]],tag=kind==='follow'?'follow':'share';
-  if(A&&!over)A.fn(`${who} (${tag})`);else feed(`${kind==='follow'?'➕':'↗️'} ${who} ${tag}`);
+  ftext(kind==='follow'?'➕ FOLLOW!':'↗️ SHARE!','#25f4ee');
+  const rs=CFG.rules.filter(r=>r.on===kind);
+  if(!rs.length){feed(`${kind==='follow'?'➕':'↗️'} ${who} ${kind} (chưa gán hiệu ứng)`);return}
+  rs.forEach(r=>runRule(r,who,kind));
 }
 let lastC={};
 function comment(t,who){
-  const a=CFG.words[String(t||'').trim().toLowerCase()];
-  if(!a)return;
-  const k=Date.now();if(lastC[who]&&k-lastC[who]<30000)return;lastC[who]=k;act(a,who);
+  const key=norm(t);if(!key)return;
+  const rs=CFG.rules.filter(r=>r.on==='comment'&&norm(r.p)===key);if(!rs.length)return;
+  const k=Date.now();if(lastC[who]&&k-lastC[who]<30000)return;lastC[who]=k;
+  rs.forEach(r=>runRule(r,who,'comment'));
 }
-const cap=s=>String(s).replace(/\b\w/g,c=>c.toUpperCase());
+const cap=x=>String(x).replace(/\b\w/g,c=>c.toUpperCase());
+function ruleLabel(r){
+  const A=ACTION[r.do];if(!A)return null;const to=`${A.e} ${A.t}`;
+  switch(r.on){
+    case 'gift':return `🎁 ${cap(r.p||'?')} → ${to}`;
+    case 'coin':return `💰 Quà ≥${r.p} xu → ${to}`;
+    case 'like':return `❤️ Mỗi ${r.p||50} tim → ${to}`;
+    case 'follow':return `➕ Follow → ${to}`;
+    case 'share':return `↗️ Share → ${to}`;
+    case 'comment':return `💬 "${r.p}" → ${to}`;
+  }
+  return null;
+}
 function renderLegend(){
   const el=$('legend');el.classList.toggle('hide',!CFG.legend);
   const rows=[];
-  if(CFG.likeBlocks>0)rows.push(`❤️ Thả tim → +${CFG.likeBlocks} khối/tim`);
-  const f=ACTION[CFG.follow],sh=ACTION[CFG.share];
-  if(f)rows.push(`➕ Follow → ${f.e} ${f.t}`);
-  if(sh)rows.push(`↗️ Share → ${sh.e} ${sh.t}`);
-  const g=Object.entries(CFG.gifts).filter(([k,a])=>ACTION[a]),max=6;
-  g.slice(0,max).forEach(([k,a])=>rows.push(`🎁 ${cap(k)} → ${ACTION[a].e} ${ACTION[a].t}`));
-  if(g.length>max)rows.push(`… +${g.length-max} quà nữa`);
+  if(CFG.likeBlocks>0)rows.push(`❤️ Mỗi tim → +${CFG.likeBlocks} khối`);
+  const all=CFG.rules.map(ruleLabel).filter(Boolean),max=7;
+  all.slice(0,max).forEach(x=>rows.push(x));
+  if(all.length>max)rows.push(`… +${all.length-max} tương tác nữa`);
   el.innerHTML='<b>🎁 CÁCH CHƠI</b>'+rows.map(r=>`<div>${r.replace(/&/g,'&amp;').replace(/</g,'&lt;')}</div>`).join('');
 }
 
@@ -432,41 +480,81 @@ function dbg(s){dbgLines.push(String(s).slice(0,200));if(dbgLines.length>10)dbgL
 function conn(ok){$('conn').textContent=ok?'🟢 đã nối TikTok':'🔴 chưa nối TikTok'}
 function wsURL(){
   let u=(CFG.ws||'').trim();if(!u)return '';
-  const p=[];
+  const direct=/tik\.tools/i.test(u),p=[];
   if(CFG.uid)p.push('uniqueId='+encodeURIComponent(CFG.uid.replace(/^@/,'')));
-  if(CFG.token)p.push('token='+encodeURIComponent(CFG.token));
+  if(direct){if(CFG.key||CFG.token)p.push('apiKey='+encodeURIComponent(CFG.key||CFG.token))}else if(CFG.token)p.push('token='+encodeURIComponent(CFG.token));
   if(p.length)u+=(u.includes('?')?'&':'?')+p.join('&');
   return u;
 }
-function connect(){
-  if(sock){closing=true;try{sock.close()}catch(e){}}
+let retryN=0,retryT=null,stableT=null;
+function connect(manual){
+  clearTimeout(retryT);clearTimeout(stableT);
+  if(manual)retryN=0;
+  if(sock){const o=sock;sock=null;o.onopen=o.onclose=o.onerror=o.onmessage=null;try{o.close()}catch(e){}}
   const url=wsURL();
   if(!url){conn(false);return}
-  if(/eulerstream\.com/i.test(url)){dbg('✖ Link Euler trực tiếp là dữ liệu nhị phân và cần chìa khoá tạm → phải dùng server trung gian (xem hướng dẫn)');conn(false);return}
-  closing=false;
-  try{sock=new WebSocket(url)}catch(e){dbg('Lỗi URL: '+e.message);return}
-  sock.onopen=()=>{conn(true);dbg('✔ đã kết nối server')};
-  sock.onmessage=e=>handleMsg(e.data);
-  sock.onerror=()=>dbg('✖ lỗi kết nối');
-  sock.onclose=ev=>{conn(false);if(ev&&(ev.code===4401||ev.code===4400)){dbg('✖ server từ chối (mã '+ev.code+'): kiểm tra mã bảo vệ / tên TikTok');return}if(!closing)setTimeout(connect,3000)};
+  if(/eulerstream\.com/i.test(url)){dbg('✖ Link Euler trực tiếp là dữ liệu nhị phân → game không đọc được. Dùng wss://api.tik.tools hoặc server Railway.');conn(false);return}
+  if(/tik\.tools/i.test(url)&&!/apiKey=/.test(url)){dbg('✖ Thiếu API key tik.tools (ô thứ 3)');conn(false);return}
+  if(!CFG.uid){dbg('✖ Chưa nhập tên TikTok');conn(false);return}
+  let me;try{me=new WebSocket(url)}catch(e){dbg('Lỗi URL: '+e.message);return}
+  sock=me;
+  me.onopen=()=>{if(sock!==me)return;conn(true);dbg('✔ đã mở kết nối');stableT=setTimeout(()=>{retryN=0},30000)};
+  me.onmessage=e=>{if(sock===me)handleMsg(e.data)};
+  me.onerror=()=>{if(sock===me)dbg('✖ lỗi kết nối')};
+  me.onclose=ev=>{
+    if(sock!==me)return;sock=null;clearTimeout(stableT);
+    conn(false);
+    dbg('✖ đóng (mã '+(ev&&ev.code)+(ev&&ev.reason?': '+ev.reason:'')+')');
+    if(ev&&(ev.code===4401||ev.code===4400||ev.code===1008||ev.code===4001||ev.code===4003)){dbg('→ bị từ chối: kiểm tra API key / mã bảo vệ / tên TikTok. Đã dừng thử lại.');return}
+    retryN++;
+    if(retryN>8){dbg('→ thử lại nhiều lần không được, đã dừng. Mở ⚙ rồi bấm Lưu & kết nối để thử lại.');return}
+    const w=Math.min(60000,5000*Math.pow(2,retryN-1));
+    dbg('… thử lại sau '+Math.round(w/1000)+'s');
+    retryT=setTimeout(connect,w);
+  };
 }
 function handleMsg(raw){
-  if(typeof raw!=='string'){dbg('(nhận dữ liệu nhị phân – game không đọc được, cần server trung gian)');return}
+  if(typeof raw!=='string'){dbg('(nhận dữ liệu nhị phân – game không đọc được)');return}
   let m;try{m=JSON.parse(raw)}catch(e){dbg(raw);return}
   dbg(raw);
   const list=Array.isArray(m)?m:(Array.isArray(m.messages)?m.messages:[m]);
   list.forEach(one);
 }
+// dữ liệu thô từ tik.tools: quà combo gửi nhiều lần với repeatCount tăng dần → chỉ lấy phần tăng thêm
+const _gl=new Map();let _lt=0;
+function rawGift(d,who){
+  const g=d.giftDetails||d.extendedGiftInfo||d.gift||{};
+  const name=d.giftName||d.gift_name||g.giftName||g.name||(d.giftId!=null?'gift_'+d.giftId:'unknown');
+  const key=who+'|'+(d.giftId!=null?d.giftId:name);
+  const rc=Math.max(1,+(d.repeatCount||d.repeat_count||1)||1);
+  const end=d.repeatEnd===true||d.repeatEnd===1||d.repeat_end===true;
+  const t=Date.now(),prev=_gl.get(key);let n=rc;
+  if(prev&&t-prev.t<10000){if(rc>prev.rc)n=rc-prev.rc;else if(rc===prev.rc&&end)n=0}
+  if(end)_gl.delete(key);else _gl.set(key,{rc,t});
+  if(_gl.size>500)_gl.clear();
+  return n>0?{name,n,dia:+(d.diamondCount||d.diamond_count||g.diamondCount||g.diamond_count)||0}:null;
+}
+function rawLike(d){
+  const total=+(d.totalLikeCount||d.total_like_count||d.totalLikes||d.total)||0;
+  let c=+(d.likeCount||d.like_count||d.count||d.likes)||0;
+  if(!c&&total)c=_lt&&total>_lt?total-_lt:1;
+  if(total)_lt=total;
+  return Math.max(1,Math.min(c||1,1000));
+}
 function one(m){
   if(!m||typeof m!=='object')return;
   const type=String(m.type||m.event||m.eventType||m.messageType||m.method||'').toLowerCase();
+  const raw=m.event!==undefined&&m.data!==undefined;
   const d=m.data||m.payload||m,u=d.user;
   const who=typeof u==='string'?u:((u&&(u.uniqueId||u.unique_id||u.nickname))||d.uniqueId||d.nickname||'khách');
   if(type==='status'){dbg('ℹ '+(m.msg||''));conn(/^(Đã nối)/.test(m.msg||''));return}
   if(type.includes('gift')){
-    const name=d.name||d.giftName||(d.gift&&d.gift.name)||d.gift_name||(d.extendedGiftInfo&&d.extendedGiftInfo.name)||(d.giftDetails&&d.giftDetails.giftName);
-    gift(name,who,Math.min(d.count||d.repeatCount||d.repeat_count||1,20));
-  }else if(type.includes('like')){like(d.count||d.likeCount||1,who)}
+    if(raw){const g=rawGift(d,who);if(g)gift(g.name,who,Math.min(g.n,20),g.dia)}
+    else{
+      const name=d.name||d.giftName||(d.gift&&d.gift.name)||d.gift_name||(d.extendedGiftInfo&&d.extendedGiftInfo.name)||(d.giftDetails&&d.giftDetails.giftName);
+      gift(name,who,Math.min(d.count||d.repeatCount||d.repeat_count||1,20),+(d.diamonds||d.diamondCount||0)||0);
+    }
+  }else if(type.includes('like')){like(raw?rawLike(d):(d.count||d.likeCount||1),who)}
   else if(type.includes('follow')){social('follow',who)}
   else if(type.includes('share')){social('share',who)}
   else if(type.includes('chat')||type.includes('comment')){comment(d.text||d.comment||d.content,who)}
@@ -680,48 +768,74 @@ function hud(){
 
 /* ============ CÀI ĐẶT ============ */
 const AKEYS=Object.keys(ACTION);
-function selOpts(sel,v,off){
+const KINDS=[['gift','🎁 Quà (chọn tên)'],['coin','💰 Quà từ … xu'],['like','❤️ Mỗi N tim'],['follow','➕ Follow'],['share','↗️ Share'],['comment','💬 Comment']];
+const CATALOG=['Rose','TikTok','GG','Heart Me','Finger Heart','Doughnut','Hand Hearts','Perfume','Love you','Galaxy','Lion','Universe','Corgi','Money Gun','Swan','Train','Sports Car'];
+function selOpts(sel,v){
   sel.innerHTML='';
-  if(off){const o=document.createElement('option');o.value='';o.textContent='— tắt —';sel.appendChild(o)}
   AKEYS.forEach(k=>{const o=document.createElement('option');o.value=k;o.textContent=ACTION[k].e+' '+ACTION[k].t;sel.appendChild(o)});
   sel.value=v;
 }
-function addRow(name='',a='win+'){
-  const d=document.createElement('div');d.className='gr';
-  const i=document.createElement('input');i.value=name;i.placeholder='tên quà (vd: rose)';i.setAttribute('autocapitalize','off');i.setAttribute('autocorrect','off');
-  const s=document.createElement('select');selOpts(s,a,false);
-  const x=document.createElement('button');x.className='b';x.textContent='✕';x.onclick=()=>d.remove();
-  d.appendChild(i);d.appendChild(s);d.appendChild(x);$('gl').appendChild(d);
+const HINT={gift:'tên quà (chạm để gợi ý)',coin:'số xu tối thiểu, vd 100',like:'mỗi bao nhiêu tim, vd 50',comment:'chữ comment, vd tnt'};
+function addRule(r){
+  r=r||{on:'gift',p:'',do:'win+'};
+  const d=document.createElement('div');d.className='rr';
+  const k=document.createElement('select');k.className='k';
+  KINDS.forEach(([v,t])=>{const o=document.createElement('option');o.value=v;o.textContent=t;k.appendChild(o)});k.value=r.on;
+  const p=document.createElement('input');p.className='p';p.value=r.p==null?'':r.p;
+  p.setAttribute('autocapitalize','off');p.setAttribute('autocorrect','off');
+  const a=document.createElement('select');a.className='a';selOpts(a,r.do);
+  const t=document.createElement('button');t.className='b t';t.textContent='▶';t.onclick=()=>{const A=ACTION[a.value];if(A)A.fn('Test')};
+  const x=document.createElement('button');x.className='b t';x.textContent='✕';x.onclick=()=>d.remove();
+  const sync=()=>{
+    const v=k.value,hide=(v==='follow'||v==='share');
+    p.style.display=hide?'none':'';
+    p.setAttribute('inputmode',(v==='coin'||v==='like')?'numeric':'text');
+    p.placeholder=HINT[v]||'';
+    if(v==='gift')p.setAttribute('list','giftlist');else p.removeAttribute('list');
+  };
+  k.onchange=sync;sync();
+  d.appendChild(k);d.appendChild(p);d.appendChild(a);d.appendChild(t);d.appendChild(x);
+  $('rl').appendChild(d);
 }
-function renderSeen(){
-  const box=$('seen');box.innerHTML='';
-  [...seen.keys()].slice(-30).forEach(k=>{
-    if(CFG.gifts[k])return;
-    const b=document.createElement('button');b.className='b chip';b.textContent=k+' ×'+seen.get(k);
-    b.onclick=()=>{addRow(k,'win+');b.remove()};box.appendChild(b);
-  });
+function addGiftRule(name){addRule({on:'gift',p:name,do:'win+'});const l=$('rl').lastChild;if(l&&l.scrollIntoView)l.scrollIntoView({block:'nearest'})}
+function renderChips(){
+  const mk=(box,names,label)=>{
+    box.innerHTML='';
+    names.forEach(n=>{const b=document.createElement('button');b.className='b chip';b.textContent=label(n);b.onclick=()=>addGiftRule(n);box.appendChild(b)});
+  };
+  mk($('cat'),CATALOG,n=>n);
+  mk($('seen'),[...seen.keys()].slice(-30),n=>n+(seenDia.get(n)?' · '+seenDia.get(n)+' xu':'')+' ×'+seen.get(n));
+  const dl=$('giftlist');dl.innerHTML='';
+  [...new Set([...CATALOG,...[...seen.keys()]])].forEach(n=>{const o=document.createElement('option');o.value=n;dl.appendChild(o)});
 }
 function openSet(){
-  $('ws').value=CFG.ws;$('uid').value=CFG.uid;$('token').value=CFG.token;
+  $('ws').value=CFG.ws;$('uid').value=CFG.uid;$('token').value=CFG.token;$('tkey').value=CFG.key||'';
   $('rate').value=CFG.rate;$('hold').value=CFG.hold;$('goalw').value=CFG.goalw;$('likeb').value=CFG.likeBlocks;
-  selOpts($('fol'),CFG.follow,true);selOpts($('sha'),CFG.share,true);
-  $('gl').innerHTML='';Object.entries(CFG.gifts).forEach(([k,a])=>addRow(k,a));
-  $('words').value=JSON.stringify(CFG.words);$('leg').checked=!!CFG.legend;
-  renderSeen();$('set').classList.add('show');
+  $('rl').innerHTML='';CFG.rules.forEach(r=>addRule(r));
+  $('leg').checked=!!CFG.legend;
+  renderChips();$('set').classList.add('show');
 }
 function closeSet(){$('set').classList.remove('show')}
+function readRules(){
+  const out=[];
+  document.querySelectorAll('#rl .rr').forEach(d=>{
+    const on=d.querySelector('.k').value,p=String(d.querySelector('.p').value||'').trim(),a=d.querySelector('.a').value;
+    if(!ACTION[a])return;
+    if((on==='gift'||on==='comment')&&!p)return;
+    if((on==='coin'||on==='like')&&!(+p>0))return;
+    out.push({on,p:(on==='follow'||on==='share')?'':p,do:a});
+  });
+  return out;
+}
 function saveCfg(){
-  let words;
-  try{words=JSON.parse($('words').value||'{}')}catch(e){alert('JSON comment bị sai: '+e.message);return}
-  const gifts={};
-  document.querySelectorAll('#gl .gr').forEach(d=>{const n=d.querySelector('input').value.trim().toLowerCase();if(n)gifts[n]=d.querySelector('select').value});
-  CFG.words=words;CFG.gifts=gifts;
-  CFG.ws=$('ws').value.trim();CFG.uid=$('uid').value.trim();CFG.token=$('token').value.trim();
+  CFG.rules=readRules();
+  ['gifts','follow','share','words'].forEach(k=>delete CFG[k]);
+  CFG.ws=$('ws').value.trim();CFG.uid=$('uid').value.trim();CFG.token=$('token').value.trim();CFG.key=$('tkey').value.trim();
   CFG.rate=+$('rate').value||15;CFG.hold=+$('hold').value||10;CFG.goalw=+$('goalw').value||15;
   const lb=parseFloat($('likeb').value);CFG.likeBlocks=isNaN(lb)?1:Math.max(0,lb);
-  CFG.follow=$('fol').value;CFG.share=$('sha').value;CFG.legend=$('leg').checked;
+  CFG.legend=$('leg').checked;
   try{localStorage.setItem('lapdat3.cfg',JSON.stringify(CFG))}catch(e){}
-  renderLegend();connect();closeSet();
+  renderLegend();connect(true);closeSet();
 }
 AKEYS.forEach(k=>{const b=document.createElement('button');b.className='b';b.textContent=ACTION[k].e+' '+ACTION[k].t;b.onclick=()=>act(k,'Test');$('tests').appendChild(b)});
 [['❤ +20 tim',()=>like(20,'Test')],['➕ Follow',()=>social('follow','Test')],['↗️ Share',()=>social('share','Test')]].forEach(([t,f])=>{const b=document.createElement('button');b.className='b';b.textContent=t;b.onclick=f;$('tests').appendChild(b)});
