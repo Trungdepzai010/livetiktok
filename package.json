@@ -4,10 +4,13 @@
   "private": true,
   "type": "module",
   "main": "server.js",
-  "scripts": { "start": "node server.js" },
-  "engines": { "node": ">=22.x" },
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": "22.x"
+  },
   "dependencies": {
-    "tiktok-live-connector": "latest",
     "ws": "^8.18.0"
   }
 }
