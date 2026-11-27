@@ -971,8 +971,13 @@ function addRule(r){
   const im=document.createElement('button');im.className='b t';d._img=r.img||'';
   const paint=()=>{const u=d._img||(k.value==='gift'?gimgOf(p.value):'');im.innerHTML='';if(u){const i=new Image();i.src=u;im.appendChild(i)}else im.textContent='🖼'};
   im.onclick=()=>{
-    if(d._img&&confirm('Xoá ảnh riêng của luật này?\nOK = xoá, Huỷ = chọn ảnh khác')){d._img='';paint();return}
-    pickImg(u=>{d._img=u;paint()});
+    if(d._img&&confirm('Luật này đã có ảnh riêng.\nOK = xoá ảnh, Huỷ = đổi ảnh khác')){d._img='';paint();return}
+    const v=prompt('Dán link ảnh quà (vd https://files.catbox.moe/abc123.png).\nĐể trống rồi OK = chọn ảnh từ album.',d._img&&/^https?:/.test(d._img)?d._img:'');
+    if(v===null)return;
+    const u=v.trim();
+    if(!u){pickImg(x=>{d._img=x;paint()});return}
+    if(!/^https?:\/\//i.test(u)){alert('Link phải bắt đầu bằng https://');return}
+    d._img=u.replace(/^http:/i,'https:');paint();
   };
   p.addEventListener('input',paint);
   const t=document.createElement('button');t.className='b t';t.textContent='▶';t.onclick=()=>{const A=ACTION[a.value];if(A)A.fn('Test')};
