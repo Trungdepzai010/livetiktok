@@ -126,6 +126,16 @@ button.p{background:#fe2c55;border-color:#fe2c55}
   <input id="vs" placeholder="Khi có share" style="margin-top:6px">
   <div style="font-size:12px;opacity:.7;margin-top:4px">{ten} = tên người xem · {qua} = tên quà · {sl} = số lượng. Để trống = không đọc loại đó. Giọng tiếng Việt phụ thuộc điện thoại (iOS: Cài đặt → Trợ năng → Nội dung được đọc → Giọng nói → Tiếng Việt).</div>
   <button class="b" onclick="testVoice()">🗣 Thử giọng</button>
+  <h3>⑤ Sao lưu / chuyển máy</h3>
+  <div style="font-size:12px;opacity:.7;margin-bottom:6px">Xuất toàn bộ cài đặt (luật, ảnh, âm thanh…) thành 1 đoạn chữ, gửi sang máy khác rồi nhập lại.</div>
+  <label class="cb"><input type="checkbox" id="bkkey">Gồm cả API key / mã bảo vệ</label>
+  <textarea id="bk" placeholder="Đoạn mã xuất ra hiện ở đây. Máy mới: dán đoạn mã vào đây rồi bấm Nhập." autocapitalize="off" autocorrect="off" spellcheck="false"></textarea>
+  <button class="b p" onclick="exportCfg()">📤 Xuất &amp; sao chép</button>
+  <button class="b" onclick="shareCfg()">↗ Chia sẻ</button>
+  <button class="b" onclick="fileCfg()">💾 Tải file</button>
+  <button class="b" onclick="importCfg($('bk').value)">📥 Nhập từ ô trên</button>
+  <button class="b" onclick="importFile()">📂 Nhập từ file</button>
+  <div id="bkmsg" style="font-size:13px;margin-top:6px;color:#25f4ee"></div>
   <h3>Test hiệu ứng</h3>
   <div id="tests"></div>
   <button class="b" id="demoBtn" onclick="toggleDemo()">▶ Demo tự động</button>
@@ -1046,7 +1056,7 @@ function readRules(){
   });
   return out;
 }
-function saveCfg(go){
+function saveCfg(go,stay){
   CFG.rules=readRules();
   ['gifts','follow','share','words'].forEach(k=>delete CFG[k]);
   CFG.ws=$('ws').value.trim();CFG.uid=$('uid').value.trim();CFG.token=$('token').value.trim();CFG.key=$('tkey').value.trim();
@@ -1056,11 +1066,49 @@ function saveCfg(go){
   CFG.music=$('mus').checked;CFG.vol=+$('vol').value;CFG.sfx=$('sfx').checked;CFG.voice=$('voi').checked;
   CFG.vg=$('vg').value.trim();CFG.vf=$('vf').value.trim();CFG.vs=$('vs').value.trim();
   try{localStorage.setItem('lapdat3.cfg',JSON.stringify(CFG))}catch(e){}
-  renderLegend();setVol();applyMusic();if(go===true)connect(true);closeSet();
+  renderLegend();setVol();applyMusic();if(go===true)connect(true);if(!stay)closeSet();
 }
 AKEYS.forEach(k=>{const b=document.createElement('button');b.className='b';b.textContent=ACTION[k].e+' '+ACTION[k].t;b.onclick=()=>act(k,'Test');$('tests').appendChild(b)});
 [['❤ +20 tim',()=>like(20,'Test')],['➕ Follow',()=>social('follow','Test')],['↗️ Share',()=>social('share','Test')]].forEach(([t,f])=>{const b=document.createElement('button');b.className='b';b.textContent=t;b.onclick=f;$('tests').appendChild(b)});
 $('gear').onclick=openSet;
+const BK_KEYS=['ws','uid','key','token','rate','hold','goalw','likeBlocks','legend','gimg','music','vol','sfx','voice','vg','vf','vs','rules'];
+const bkmsg=t=>{$('bkmsg').textContent=t};
+function buildBackup(){
+  saveCfg(false,true);
+  const o={_v:'lapdat-v5'},sec=$('bkkey').checked;
+  BK_KEYS.forEach(k=>{if(!sec&&(k==='key'||k==='token'))return;o[k]=CFG[k]});
+  const t=JSON.stringify(o);$('bk').value=t;return t;
+}
+function copyText(t){
+  const ta=$('bk');ta.focus();ta.select();try{ta.setSelectionRange(0,t.length)}catch(e){}
+  let ok=false;try{ok=document.execCommand('copy')}catch(e){}
+  if(!ok&&navigator.clipboard){navigator.clipboard.writeText(t).then(()=>bkmsg('✔ Đã sao chép '+t.length+' ký tự'),()=>{});return true}
+  return ok;
+}
+function exportCfg(){const t=buildBackup();bkmsg(copyText(t)?'✔ Đã sao chép '+t.length+' ký tự. Gửi sang máy kia (Zalo/Notes…) rồi dán vào ô và bấm Nhập.':'Đã tạo mã trong ô, hãy chạm giữ → Chọn tất cả → Sao chép.')}
+function shareCfg(){const t=buildBackup();if(navigator.share){navigator.share({title:'Cài đặt Lắp Đất',text:t}).catch(()=>{})}else bkmsg(copyText(t)?'✔ Máy này không có chia sẻ, đã sao chép thay thế.':'Không chia sẻ được, hãy tự sao chép trong ô.')}
+function fileCfg(){
+  const t=buildBackup(),a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([t],{type:'application/json'}));a.download='lapdat-cai-dat.json';
+  document.body.appendChild(a);a.click();setTimeout(()=>{a.remove();URL.revokeObjectURL(a.href)},1000);
+  bkmsg('Đã tạo file lapdat-cai-dat.json (xem trong Tệp/Tải xuống).');
+}
+function importFile(){
+  const f=document.createElement('input');f.type='file';f.accept='.json,application/json,text/plain';
+  f.onchange=()=>{const file=f.files&&f.files[0];if(!file)return;const fr=new FileReader();fr.onload=()=>{$('bk').value=fr.result;importCfg(fr.result)};fr.readAsText(file)};
+  f.click();
+}
+function importCfg(txt){
+  let o;try{o=JSON.parse(String(txt||'').trim())}catch(e){bkmsg('✖ Không đọc được. Kiểm tra đã dán đủ đoạn mã chưa.');return}
+  if(!o||typeof o!=='object'||!Array.isArray(o.rules)){bkmsg('✖ Đây không phải mã cài đặt của game.');return}
+  BK_KEYS.forEach(k=>{if(o[k]!==undefined)CFG[k]=o[k]});
+  CFG.rules=o.rules.filter(r=>r&&ACTION[r.do]&&typeof r.on==='string').map(r=>{
+    const x={on:r.on,p:String(r.p==null?'':r.p),do:r.do};
+    if(typeof r.img==='string'&&/^(data:image\/|https:)/.test(r.img))x.img=r.img;return x});
+  if(!CFG.gimg||typeof CFG.gimg!=='object')CFG.gimg={};
+  saveLS();renderLegend();setVol();applyMusic();openSet();
+  bkmsg('✔ Đã nhập '+CFG.rules.length+' luật và toàn bộ cài đặt. Bấm Kết nối khi sẵn sàng.');
+}
 function goFull(){
   const el=document.documentElement,f=el.requestFullscreen||el.webkitRequestFullscreen;
   if(document.fullscreenElement||document.webkitFullscreenElement){(document.exitFullscreen||document.webkitExitFullscreen).call(document);return}
