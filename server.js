@@ -10,9 +10,19 @@ import http from 'node:http';
 /* ---------- chuẩn hoá sự kiện (thuần, không cần thư viện ngoài) ---------- */
 export const num = (...v) => { for (const x of v) { const n = Number(x); if (Number.isFinite(n) && n > 0) return n } return 0 };
 const isTrue = v => v === true || v === 1 || v === '1' || v === 'true';
+export const imgOf = (d, g = {}) => {
+  for (const x of [d?.giftPictureUrl, d?.gift_picture_url, d?.giftImage, d?.image, d?.giftIcon, g.giftPictureUrl, g.giftImage, g.image, g.icon]) {
+    if (!x) continue;
+    if (typeof x === 'string') { if (/^https?:/i.test(x)) return x.replace(/^http:/i, 'https:'); continue }
+    const u = x.urlList || x.url_list || x.urls;
+    if (Array.isArray(u) && u[0]) return String(u[0]).replace(/^http:/i, 'https:');
+    if (typeof x.url === 'string') return x.url.replace(/^http:/i, 'https:');
+  }
+  return '';
+};
 export const userOf = d => {
   const u = d?.user ?? {};
-  return u.uniqueId || u.unique_id || u.nickname || d?.uniqueId || d?.nickname || 'khách';
+  return u.nickname || u.uniqueId || u.unique_id || d?.nickname || d?.uniqueId || 'khách';
 };
 
 // Quà combo (streak) gửi nhiều sự kiện với repeatCount tăng dần: chỉ chuyển phần tăng thêm, tránh đếm trùng.
@@ -35,7 +45,7 @@ export function makeGiftNorm() {
     if (end) last.delete(key); else last.set(key, { rc, t: now });
     if (last.size > 500) for (const k of last.keys()) { last.delete(k); if (last.size < 250) break }
     if (n <= 0) return null;
-    return { type: 'gift', user, name: String(name), id: d?.giftId, count: n, diamonds: num(d?.diamondCount, d?.diamond_count, g.diamondCount, g.diamond_count) };
+    return { type: 'gift', user, name: String(name), id: d?.giftId, count: n, img: imgOf(d, g), diamonds: num(d?.diamondCount, d?.diamond_count, g.diamondCount, g.diamond_count) };
   };
 }
 export const normFollow = d => ({ type: 'follow', user: userOf(d) });
