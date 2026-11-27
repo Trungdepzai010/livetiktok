@@ -3,10 +3,15 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Lắp Đất">
+<meta name="theme-color" content="#111111">
 <title>Lắp Đất 3D Live</title>
 <style>
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{margin:0;height:100%;overflow:hidden;background:#111;color:#fff;font-family:-apple-system,system-ui,"Segoe UI",sans-serif}
+html,body{margin:0;height:100%;height:100dvh;overflow:hidden;overscroll-behavior:none;position:fixed;inset:0;width:100%;background:#111;color:#fff;font-family:-apple-system,system-ui,"Segoe UI",sans-serif}
 #c{position:absolute;inset:0;width:100%;height:100%;display:block;image-rendering:pixelated}
 #vig{position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse at 50% 45%,transparent 55%,rgba(0,0,0,.45) 100%)}
 #hud{position:absolute;top:0;left:0;right:0;padding:calc(env(safe-area-inset-top) + 8px) 12px 0;pointer-events:none}
@@ -24,6 +29,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:#111;color:#fff;font-f
 #feed{position:absolute;left:10px;bottom:calc(env(safe-area-inset-bottom) + 10px);display:flex;flex-direction:column;gap:4px;max-width:44%;pointer-events:none}
 #feed div{background:rgba(10,12,30,.65);border:1px solid rgba(255,255,255,.1);padding:4px 10px;border-radius:12px;font-size:13px;font-weight:600;width:fit-content;animation:in .25s}
 @keyframes in{from{transform:translateX(-30px);opacity:0}}
+#fs{position:absolute;top:calc(46% + 44px);right:6px;opacity:.25;background:#000a;color:#fff;border:0;border-radius:8px;padding:6px 9px;font-size:16px;z-index:5}
 #gear{position:absolute;top:46%;right:6px;opacity:.25;background:#000a;color:#fff;border:0;border-radius:8px;padding:6px 9px;font-size:16px;z-index:5}
 #set{position:fixed;left:0;right:0;top:0;height:56%;background:rgba(11,14,26,.97);z-index:20;display:none;overflow:auto;-webkit-overflow-scrolling:touch;padding:calc(env(safe-area-inset-top) + 10px) 14px 24px;border-radius:0 0 18px 18px;border-bottom:2px solid #25f4ee;box-shadow:0 10px 30px rgba(0,0,0,.6)}
 #set.show{display:block}
@@ -84,7 +90,7 @@ button.p{background:#fe2c55;border-color:#fe2c55}
 </div>
 <div id="feed"></div>
 <div id="tkL" class="tk"></div><div id="tkR" class="tk"></div>
-<button id="gear">⚙</button>
+<button id="gear">⚙</button><button id="fs" onclick="goFull()">⛶</button>
 
 <div id="set">
   <button class="b" onclick="closeSet()">✕ Đóng</button>
@@ -1055,6 +1061,13 @@ function saveCfg(go){
 AKEYS.forEach(k=>{const b=document.createElement('button');b.className='b';b.textContent=ACTION[k].e+' '+ACTION[k].t;b.onclick=()=>act(k,'Test');$('tests').appendChild(b)});
 [['❤ +20 tim',()=>like(20,'Test')],['➕ Follow',()=>social('follow','Test')],['↗️ Share',()=>social('share','Test')]].forEach(([t,f])=>{const b=document.createElement('button');b.className='b';b.textContent=t;b.onclick=f;$('tests').appendChild(b)});
 $('gear').onclick=openSet;
+function goFull(){
+  const el=document.documentElement,f=el.requestFullscreen||el.webkitRequestFullscreen;
+  if(document.fullscreenElement||document.webkitFullscreenElement){(document.exitFullscreen||document.webkitExitFullscreen).call(document);return}
+  if(f&&!/iPhone|iPod/.test(navigator.userAgent)){try{const r=f.call(el);if(r&&r.catch)r.catch(()=>alert(HOWFULL))}catch(e){alert(HOWFULL)}}
+  else alert(HOWFULL);
+}
+const HOWFULL='iPhone không cho web tự ẩn thanh trình duyệt.\nCách full màn hình:\n1) Mở link bằng Safari\n2) Bấm nút Chia sẻ (hình vuông có mũi tên)\n3) Chọn "Thêm vào Màn hình chính"\n4) Mở game từ icon vừa tạo → toàn màn hình, không còn thanh link.';
 $('mus').onchange=()=>{CFG.music=$('mus').checked;unlock();audioInit();applyMusic()};
 $('vol').oninput=()=>{CFG.vol=+$('vol').value;setVol()};
 let demoT=null;
